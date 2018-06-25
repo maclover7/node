@@ -206,7 +206,8 @@ class StreamResource {
   // In that case, the finish callback should *not* be called.
 
   // Perform a shutdown operation, and call req_wrap->Done() when finished.
-  virtual int DoShutdown(ShutdownWrap* req_wrap) = 0;
+  //virtual int DoShutdown(ShutdownWrap* req_wrap) = 0;
+  virtual int DoShutdown(StreamReq* req) = 0;
   // Try to write as much data as possible synchronously, and modify
   // `*bufs` and `*count` accordingly. This is a no-op by default.
   virtual int DoTryWrite(uv_buf_t** bufs, size_t* count);
@@ -296,7 +297,8 @@ class StreamBase : public StreamResource {
   // For example, a subclass Foo could create a FooWriteWrap or FooShutdownWrap
   // (inheriting from ShutdownWrap/WriteWrap) that has extra fields, like
   // an associated libuv request.
-  virtual ShutdownWrap* CreateShutdownWrap(v8::Local<v8::Object> object);
+  //virtual ShutdownWrap* CreateShutdownWrap(v8::Local<v8::Object> object);
+  virtual StreamReq* CreateStreamReq(v8::Local<v8::Object> object);
   virtual WriteWrap* CreateWriteWrap(v8::Local<v8::Object> object);
 
   // One of these must be implemented

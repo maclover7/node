@@ -685,8 +685,8 @@ void TLSWrap::OnStreamRead(ssize_t nread, const uv_buf_t& buf) {
 }
 
 
-ShutdownWrap* TLSWrap::CreateShutdownWrap(Local<Object> req_wrap_object) {
-  return underlying_stream()->CreateShutdownWrap(req_wrap_object);
+StreamReq* TLSWrap::CreateStreamReq(Local<Object> req_wrap_object) {
+  return underlying_stream()->CreateStreamReq(req_wrap_object);
 }
 
 

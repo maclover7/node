@@ -69,7 +69,17 @@ void LibuvStreamWrap::Initialize(Local<Object> target,
   sw->SetClassName(wrapString);
   AsyncWrap::AddWrapMethods(env, sw);
   target->Set(wrapString, sw->GetFunction());
-  env->set_shutdown_wrap_template(sw->InstanceTemplate());
+  //env->set_shutdown_wrap_template(sw->InstanceTemplate());
+
+  Local<FunctionTemplate> sr =
+      FunctionTemplate::New(env->isolate(), is_construct_call_callback);
+  sr->InstanceTemplate()->SetInternalFieldCount(StreamReq::kStreamReqField + 1);
+  Local<String> reqwrapString =
+      FIXED_ONE_BYTE_STRING(env->isolate(), "StreamReq");
+  sr->SetClassName(reqwrapString);
+  AsyncWrap::AddWrapMethods(env, sr);
+  target->Set(reqwrapString, sr->GetFunction());
+  env->set_shutdown_wrap_template(sr->InstanceTemplate());
 
   Local<FunctionTemplate> ww =
       FunctionTemplate::New(env->isolate(), is_construct_call_callback);

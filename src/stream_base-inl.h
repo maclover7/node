@@ -170,7 +170,7 @@ inline int StreamBase::Shutdown(v8::Local<v8::Object> req_wrap_obj) {
   }
 
   AsyncHooks::DefaultTriggerAsyncIdScope trigger_scope(GetAsyncWrap());
-  ShutdownWrap* req_wrap = CreateShutdownWrap(req_wrap_obj);
+  StreamReq* req_wrap = CreateStreamReq(req_wrap_obj);
   int err = DoShutdown(req_wrap);
 
   if (err != 0) {
@@ -236,18 +236,18 @@ inline StreamWriteResult StreamBase::Write(
 }
 
 template <typename OtherBase>
-SimpleShutdownWrap<OtherBase>::SimpleShutdownWrap(
+SimpleStreamReq<OtherBase>::SimpleStreamReq(
     StreamBase* stream,
     v8::Local<v8::Object> req_wrap_obj)
-  : ShutdownWrap(stream, req_wrap_obj),
+  : StreamReq(stream, req_wrap_obj),
     OtherBase(stream->stream_env(),
               req_wrap_obj,
               AsyncWrap::PROVIDER_SHUTDOWNWRAP) {
 }
 
-inline ShutdownWrap* StreamBase::CreateShutdownWrap(
+inline StreamReq* StreamBase::CreateStreamReq(
     v8::Local<v8::Object> object) {
-  return new SimpleShutdownWrap<AsyncWrap>(this, object);
+  return new SimpleSimpleStreamReq<AsyncWrap>(this, object);
 }
 
 template <typename OtherBase>

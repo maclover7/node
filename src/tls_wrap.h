@@ -64,9 +64,9 @@ class TLSWrap : public AsyncWrap,
   int ReadStart() override;
   int ReadStop() override;
 
-  ShutdownWrap* CreateShutdownWrap(
+  StreamReq* CreateStreamReq(
       v8::Local<v8::Object> req_wrap_object) override;
-  int DoShutdown(ShutdownWrap* req_wrap) override;
+  int DoShutdown(StreamReq* req) override;
   int DoWrite(WriteWrap* w,
               uv_buf_t* bufs,
               size_t count,
