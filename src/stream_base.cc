@@ -403,8 +403,49 @@ void ReportWritesToJSStreamListener::OnStreamAfterReqFinished(
     stream->ClearError();
   }
 
-  if (req_wrap_obj->Has(env->context(), env->oncomplete_string()).FromJust())
-    async_wrap->MakeCallback(env->oncomplete_string(), arraysize(argv), argv);
+  //Local<v8::Array> properties = stream->GetObject()->GetOwnPropertyNames(env->context()).ToLocalChecked();
+  //for (int i = 0; i < properties->Length(); ++i) {
+    //Local<Value> key = properties->Get(i);
+    //String::Utf8Value value2(key);
+    //printf("key: %s\n", *value2);
+  //}
+
+  //String::Utf8Value blob2(blob1);
+  //printf("blob2: %s\n", *blob2);
+
+  //Local<String> blob1Type = blob1->TypeOf(env->isolate());
+  //String::Utf8Value blob1TypeString(blob1Type);
+  //printf("blob1TypeString: %s\n", *blob1TypeString);
+
+  Local<Value> argv2[] = {
+    stream->GetObject(),
+    Integer::New(env->isolate(), status),
+    stream->GetObject(),
+    stream->GetObject()
+  };
+
+  if (stream->GetObject()->Has(env->context(), env->onshutdowncomplete_string()).FromJust()) {
+    printf("trying to call!");
+    v8::MaybeLocal<Value> blob1Maybe = stream->GetObject()->Get(env->context(), env->onshutdowncomplete_string());
+    if (!blob1Maybe.IsEmpty()) {
+      printf("notempty");
+      Local<Value> blob1 = blob1Maybe.ToLocalChecked();
+      if (blob1.As<v8::Function>()->Call(env->context(), stream->GetObject(), arraysize(argv2), argv2).IsEmpty()) {
+        printf("CALL_empty");
+      } else {
+        printf("CALL_notempty");
+      }
+    }
+  } else {
+
+  //Local<Value> cb =
+      //stream->GetObject()->Get(env->context(), env->onshutdowncomplete_string()).ToLocalChecked();
+  //async_wrap->MakeCallback(env->onshutdowncomplete_string(), arraysize(argv), argv);
+
+    if (req_wrap_obj->Has(env->context(), env->oncomplete_string()).FromJust()) {
+      async_wrap->MakeCallback(env->oncomplete_string(), arraysize(argv), argv);
+    }
+  }
 }
 
 void ReportWritesToJSStreamListener::OnStreamAfterWrite(
