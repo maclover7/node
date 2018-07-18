@@ -608,11 +608,6 @@ class QueryWrap : public AsyncWrap {
     return 0;
   }
 
-  virtual int Send(const char* name, int family) {
-    UNREACHABLE();
-    return 0;
-  }
-
  protected:
   void AresQuery(const char* name,
                  int dnsclass,
@@ -736,6 +731,19 @@ class QueryWrap : public AsyncWrap {
   }
 
   ChannelWrap* channel_;
+};
+
+
+template <int QueryType>
+class SimpleQueryWrap : public QueryWrap {
+ public:
+  SimpleQueryWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
+    : QueryWrap(channel, req_wrap_obj) {}
+
+  int Send(const char* name) {
+    AresQuery(name, ns_c_in, QueryType);
+    return 0;
+  }
 };
 
 
@@ -1178,16 +1186,10 @@ int ParseSoaReply(Environment* env,
 }
 
 
-class QueryAnyWrap: public QueryWrap {
+class QueryAnyWrap : public SimpleQueryWrap<ns_t_any> {
  public:
   QueryAnyWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-    : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_any);
-    return 0;
-  }
+    : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1357,16 +1359,10 @@ class QueryAnyWrap: public QueryWrap {
 };
 
 
-class QueryAWrap: public QueryWrap {
+class QueryAWrap : public SimpleQueryWrap<ns_t_a> {
  public:
   QueryAWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_a);
-    return 0;
-  }
+      : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1403,16 +1399,10 @@ class QueryAWrap: public QueryWrap {
 };
 
 
-class QueryAaaaWrap: public QueryWrap {
+class QueryAaaaWrap : public SimpleQueryWrap<ns_t_aaaa> {
  public:
   QueryAaaaWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_aaaa);
-    return 0;
-  }
+      : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1449,16 +1439,10 @@ class QueryAaaaWrap: public QueryWrap {
 };
 
 
-class QueryCnameWrap: public QueryWrap {
+class QueryCnameWrap : public SimpleQueryWrap<ns_t_cname> {
  public:
   QueryCnameWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_cname);
-    return 0;
-  }
+      : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1482,16 +1466,10 @@ class QueryCnameWrap: public QueryWrap {
 };
 
 
-class QueryMxWrap: public QueryWrap {
+class QueryMxWrap : public SimpleQueryWrap<ns_t_mx> {
  public:
   QueryMxWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_mx);
-    return 0;
-  }
+      : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1515,16 +1493,10 @@ class QueryMxWrap: public QueryWrap {
 };
 
 
-class QueryNsWrap: public QueryWrap {
+class QueryNsWrap : public SimpleQueryWrap<ns_t_ns> {
  public:
   QueryNsWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_ns);
-    return 0;
-  }
+      : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1548,16 +1520,10 @@ class QueryNsWrap: public QueryWrap {
 };
 
 
-class QueryTxtWrap: public QueryWrap {
+class QueryTxtWrap : public SimpleQueryWrap<ns_t_txt> {
  public:
   QueryTxtWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_txt);
-    return 0;
-  }
+      : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1580,16 +1546,10 @@ class QueryTxtWrap: public QueryWrap {
 };
 
 
-class QuerySrvWrap: public QueryWrap {
+class QuerySrvWrap : public SimpleQueryWrap<ns_t_srv> {
  public:
-  explicit QuerySrvWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_srv);
-    return 0;
-  }
+  QuerySrvWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
+      : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1611,16 +1571,10 @@ class QuerySrvWrap: public QueryWrap {
   }
 };
 
-class QueryPtrWrap: public QueryWrap {
+class QueryPtrWrap : public SimpleQueryWrap<ns_t_ptr> {
  public:
-  explicit QueryPtrWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_ptr);
-    return 0;
-  }
+  QueryPtrWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
+      : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1644,16 +1598,10 @@ class QueryPtrWrap: public QueryWrap {
   }
 };
 
-class QueryNaptrWrap: public QueryWrap {
+class QueryNaptrWrap : public SimpleQueryWrap<ns_t_naptr> {
  public:
-  explicit QueryNaptrWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_naptr);
-    return 0;
-  }
+  QueryNaptrWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
+      : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1676,16 +1624,10 @@ class QueryNaptrWrap: public QueryWrap {
 };
 
 
-class QuerySoaWrap: public QueryWrap {
+class QuerySoaWrap : public SimpleQueryWrap<ns_t_soa> {
  public:
   QuerySoaWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
-
-  int Send(const char* name) override {
-    AresQuery(name, ns_c_in, ns_t_soa);
-    return 0;
-  }
+      : SimpleQueryWrap(channel, req_wrap_obj) {}
 
   void MemoryInfo(MemoryTracker* tracker) const override {
     tracker->TrackThis(this);
@@ -1739,11 +1681,10 @@ class QuerySoaWrap: public QueryWrap {
 };
 
 
-class GetHostByAddrWrap: public QueryWrap {
+class GetHostByAddrWrap : public QueryWrap {
  public:
-  explicit GetHostByAddrWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
-      : QueryWrap(channel, req_wrap_obj) {
-  }
+  GetHostByAddrWrap(ChannelWrap* channel, Local<Object> req_wrap_obj)
+      : QueryWrap(channel, req_wrap_obj) {}
 
   int Send(const char* name) override {
     int length, family;
