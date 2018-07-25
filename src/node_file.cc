@@ -435,6 +435,16 @@ void NewFSReqCallback(const FunctionCallbackInfo<Value>& args) {
   new FSReqCallback(env, args.This(), args[0]->IsTrue());
 }
 
+void NewFSReqPromise(const FunctionCallbackInfo<Value>& args) {
+  CHECK(args.IsConstructCall());
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  if (args[0]->IsTrue()) {
+    new FSReqPromise<uint64_t, BigUint64Array>(env, args.This(), true);
+  } else {
+    new FSReqPromise<double, Float64Array>(env, args.This(), false);
+  }
+}
+
 FSReqAfterScope::FSReqAfterScope(FSReqBase* wrap, uv_fs_t* req)
     : wrap_(wrap),
       req_(req),
@@ -669,16 +679,9 @@ inline int SyncCall(Environment* env, Local<Value> ctx, FSReqWrapSync* req_wrap,
   return err;
 }
 
-inline FSReqBase* GetReqWrap(Environment* env, Local<Value> value,
-                             bool use_bigint = false) {
+inline FSReqBase* GetReqWrap(Environment* env, Local<Value> value) {
   if (value->IsObject()) {
     return Unwrap<FSReqBase>(value.As<Object>());
-  } else if (value->StrictEquals(env->fs_use_promises_symbol())) {
-    if (use_bigint) {
-      return new FSReqPromise<uint64_t, BigUint64Array>(env, use_bigint);
-    } else {
-      return new FSReqPromise<double, Float64Array>(env, use_bigint);
-    }
   }
   return nullptr;
 }
@@ -830,7 +833,7 @@ static void Stat(const FunctionCallbackInfo<Value>& args) {
   CHECK_NOT_NULL(*path);
 
   bool use_bigint = args[1]->IsTrue();
-  FSReqBase* req_wrap_async = GetReqWrap(env, args[2], use_bigint);
+  FSReqBase* req_wrap_async = GetReqWrap(env, args[2]);
   if (req_wrap_async != nullptr) {  // stat(path, use_bigint, req)
     AsyncCall(env, req_wrap_async, args, "stat", UTF8, AfterStat,
               uv_fs_stat, *path);
@@ -860,7 +863,7 @@ static void LStat(const FunctionCallbackInfo<Value>& args) {
   CHECK_NOT_NULL(*path);
 
   bool use_bigint = args[1]->IsTrue();
-  FSReqBase* req_wrap_async = GetReqWrap(env, args[2], use_bigint);
+  FSReqBase* req_wrap_async = GetReqWrap(env, args[2]);
   if (req_wrap_async != nullptr) {  // lstat(path, use_bigint, req)
     AsyncCall(env, req_wrap_async, args, "lstat", UTF8, AfterStat,
               uv_fs_lstat, *path);
@@ -891,7 +894,7 @@ static void FStat(const FunctionCallbackInfo<Value>& args) {
   int fd = args[0].As<Int32>()->Value();
 
   bool use_bigint = args[1]->IsTrue();
-  FSReqBase* req_wrap_async = GetReqWrap(env, args[2], use_bigint);
+  FSReqBase* req_wrap_async = GetReqWrap(env, args[2]);
   if (req_wrap_async != nullptr) {  // fstat(fd, use_bigint, req)
     AsyncCall(env, req_wrap_async, args, "fstat", UTF8, AfterStat,
               uv_fs_fstat, fd);
@@ -1976,14 +1979,14 @@ void Initialize(Local<Object> target,
       fst->InstanceTemplate());
 
   // Create Function Template for FSReqPromise
-  Local<FunctionTemplate> fpt = FunctionTemplate::New(env->isolate());
+  Local<FunctionTemplate> fpt = env->NewFunctionTemplate(NewFSReqPromise);
   AsyncWrap::AddWrapMethods(env, fpt);
   Local<String> promiseString =
       FIXED_ONE_BYTE_STRING(env->isolate(), "FSReqPromise");
   fpt->SetClassName(promiseString);
-  Local<ObjectTemplate> fpo = fpt->InstanceTemplate();
-  fpo->SetInternalFieldCount(1);
-  env->set_fsreqpromise_constructor_template(fpo);
+  fpt->InstanceTemplate()->SetInternalFieldCount(1);
+  env->set_fsreqpromise_constructor_template(fpt);
+  target->Set(promiseString, fpt->GetFunction());
 
   // Create FunctionTemplate for FileHandle
   Local<FunctionTemplate> fd = env->NewFunctionTemplate(FileHandle::New);
@@ -2007,14 +2010,6 @@ void Initialize(Local<Object> target,
   Local<ObjectTemplate> fdcloset = fdclose->InstanceTemplate();
   fdcloset->SetInternalFieldCount(1);
   env->set_fdclose_constructor_template(fdcloset);
-
-  Local<Symbol> use_promises_symbol =
-    Symbol::New(env->isolate(),
-                FIXED_ONE_BYTE_STRING(env->isolate(), "use promises"));
-  env->set_fs_use_promises_symbol(use_promises_symbol);
-  target->Set(env->context(),
-              FIXED_ONE_BYTE_STRING(env->isolate(), "kUsePromises"),
-              use_promises_symbol).FromJust();
 }
 
 }  // namespace fs

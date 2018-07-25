@@ -326,8 +326,7 @@ struct PackageConfig {
   V(fdclose_constructor_template, v8::ObjectTemplate)                         \
   V(fd_constructor_template, v8::ObjectTemplate)                              \
   V(filehandlereadwrap_template, v8::ObjectTemplate)                          \
-  V(fsreqpromise_constructor_template, v8::ObjectTemplate)                    \
-  V(fs_use_promises_symbol, v8::Symbol)                                       \
+  V(fsreqpromise_constructor_template, v8::FunctionTemplate)                  \
   V(host_import_module_dynamically_callback, v8::Function)                    \
   V(host_initialize_import_meta_object_callback, v8::Function)                \
   V(http2ping_constructor_template, v8::ObjectTemplate)                       \
