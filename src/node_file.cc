@@ -639,7 +639,9 @@ inline int AsyncDestCall(Environment* env,
   }
 
   CHECK_NOT_NULL(req_wrap);
-  req_wrap->Init(syscall, dest, len, enc);
+  if (after != nullptr) {
+    req_wrap->Init(syscall, dest, len, enc);
+  }
 
   int err = fn(env->event_loop(), req_wrap->req(), fn_args..., after);
   req_wrap->Dispatched();
@@ -966,7 +968,7 @@ static void Link(const FunctionCallbackInfo<Value>& args) {
   FSReqBase* req_wrap = GetReqWrap(env, args[2]);
   uv_fs_cb cb = req_wrap->IsAsync() ? AfterNoArgs : nullptr;
   AsyncDestCall(env, req_wrap, args, "link", *dest, dest.length(), UTF8,
-                  AfterNoArgs, uv_fs_link, *src, *dest);
+                  cb, uv_fs_link, *src, *dest);
   if (cb == nullptr)
     delete req_wrap;
 }
@@ -1341,11 +1343,16 @@ static void CopyFile(const FunctionCallbackInfo<Value>& args) {
 
   FSReqBase* req_wrap = GetReqWrap(env, args[3]);
   uv_fs_cb cb = req_wrap->IsAsync() ? AfterNoArgs : nullptr;
-  AsyncDestCall(env, req_wrap, args, "copyfile",
-                  *dest, dest.length(), UTF8, cb,
-                  uv_fs_copyfile, *src, *dest, flags);
-  if (cb == nullptr)
+
+  if (req_wrap->IsAsync()) {
+    AsyncDestCall(env, req_wrap, args, "copyfile",
+        *dest, dest.length(), UTF8, cb,
+        uv_fs_copyfile, *src, *dest, flags);
+  } else {
+    AsyncCall(env, req_wrap, args, "copyfile", UTF8, cb,
+           uv_fs_copyfile, *src, *dest, flags);
     delete req_wrap;
+  }
 }
 
 
@@ -1488,22 +1495,48 @@ static void WriteString(const FunctionCallbackInfo<Value>& args) {
     }
   }
 
-  len = StringBytes::StorageSize(env->isolate(), value, enc);
-  FSReqBase::FSReqBuffer& stack_buffer =
-      req_wrap->Init("write", len, enc);
-  // StorageSize may return too large a char, so correct the actual length
-  // by the write size
-  len = StringBytes::Write(env->isolate(), *stack_buffer, len, args[1], enc);
-  stack_buffer.SetLengthAndZeroTerminate(len);
-  uv_buf_t uvbuf = uv_buf_init(*stack_buffer, len);
-
-  uv_fs_cb cb = req_wrap->IsAsync() ? AfterInteger : nullptr;
-  int bytesWritten = AsyncCall(env, req_wrap, args, "write", enc, cb,
-              uv_fs_write, fd, &uvbuf, 1, pos);
-  if (cb == nullptr) {
+  if (is_async) {  // write(fd, string, pos, enc, req)
+    CHECK_NOT_NULL(req_wrap);
+    len = StringBytes::StorageSize(env->isolate(), value, enc);
+    FSReqBase::FSReqBuffer& stack_buffer =
+        req_wrap->Init("write", len, enc);
+    // StorageSize may return too large a char, so correct the actual length
+    // by the write size
+    len = StringBytes::Write(env->isolate(), *stack_buffer, len, args[1], enc);
+    stack_buffer.SetLengthAndZeroTerminate(len);
+    uv_buf_t uvbuf = uv_buf_init(*stack_buffer, len);
+    int err = uv_fs_write(env->event_loop(), req_wrap->req(),
+                          fd, &uvbuf, 1, pos, AfterInteger);
+    req_wrap->Dispatched();
+    if (err < 0) {
+      uv_fs_t* uv_req = req_wrap->req();
+      uv_req->result = err;
+      uv_req->path = nullptr;
+      AfterInteger(uv_req);  // after may delete req_wrap_async if there is
+                             // an error
+    } else {
+      req_wrap->SetReturnValue(args);
+    }
+  } else {  // write(fd, string, pos, enc, undefined, ctx)
+    FSReqBase::FSReqBuffer stack_buffer;
+    if (buf == nullptr) {
+      len = StringBytes::StorageSize(env->isolate(), value, enc);
+      stack_buffer.AllocateSufficientStorage(len + 1);
+      // StorageSize may return too large a char, so correct the actual length
+      // by the write size
+      len = StringBytes::Write(env->isolate(), *stack_buffer,
+                               len, args[1], enc);
+      stack_buffer.SetLengthAndZeroTerminate(len);
+      buf = *stack_buffer;
+    }
+    uv_buf_t uvbuf = uv_buf_init(buf, len);
+    FS_SYNC_TRACE_BEGIN(write);
+    int bytesWritten = uv_fs_write(env->event_loop(), req_wrap->req(),
+                          fd, &uvbuf, 1, pos, nullptr);
+    //int bytesWritten = AsyncCall(env, args, &req_wrap_sync, "write",
+                                //uv_fs_write, fd, &uvbuf, 1, pos);
     FS_SYNC_TRACE_END(write, "bytesWritten", bytesWritten);
     args.GetReturnValue().Set(bytesWritten);
-    delete req_wrap;
   }
 }
 
