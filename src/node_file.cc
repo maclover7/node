@@ -67,7 +67,6 @@ using v8::Object;
 using v8::ObjectTemplate;
 using v8::Promise;
 using v8::String;
-using v8::Symbol;
 using v8::Uint32;
 using v8::Undefined;
 using v8::Value;
@@ -926,7 +925,7 @@ static void FStat(const FunctionCallbackInfo<Value>& args) {
   }
 }
 
-// TODO
+// TODO(maclover7)
 // symlink(target, path, flags, req)
 static void Symlink(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
@@ -950,7 +949,7 @@ static void Symlink(const FunctionCallbackInfo<Value>& args) {
     delete req_wrap;
 }
 
-// TODO
+// TODO(maclovery)
 // link(src, dest, req)
 static void Link(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
@@ -1001,7 +1000,9 @@ static void ReadLink(const FunctionCallbackInfo<Value>& args) {
                                                encoding,
                                                &error);
     if (rc.IsEmpty()) {
-      req_wrap->object()->Set(env->context(), env->error_string(), error).FromJust();
+      req_wrap->object()->Set(env->context(),
+                              env->error_string(),
+                              error).FromJust();
       return;
     }
 
@@ -1011,7 +1012,7 @@ static void ReadLink(const FunctionCallbackInfo<Value>& args) {
   }
 }
 
-// TODO
+// TODO(maclover7)
 static void Rename(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
@@ -1172,7 +1173,9 @@ static void RealPath(const FunctionCallbackInfo<Value>& args) {
                                                encoding,
                                                &error);
     if (rc.IsEmpty()) {
-      req_wrap->object()->Set(env->context(), env->error_string(), error).FromJust();
+      req_wrap->object()->Set(env->context(),
+                              env->error_string(),
+                              error).FromJust();
       return;
     }
 
@@ -1232,7 +1235,9 @@ static void ReadDir(const FunctionCallbackInfo<Value>& args) {
                                                        encoding,
                                                        &error);
       if (filename.IsEmpty()) {
-        req_wrap->object()->Set(env->context(), env->error_string(), error).FromJust();
+        req_wrap->object()->Set(env->context(),
+                                env->error_string(),
+                                error).FromJust();
         return;
       }
 
@@ -1756,7 +1761,9 @@ static void Mkdtemp(const FunctionCallbackInfo<Value>& args) {
         StringBytes::Encode(env->isolate(), path, encoding, &error);
 
     if (rc.IsEmpty()) {
-      req_wrap->object()->Set(env->context(), env->error_string(), error).FromJust();
+      req_wrap->object()->Set(env->context(),
+                              env->error_string(),
+                              error).FromJust();
       return;
     }
     args.GetReturnValue().Set(rc.ToLocalChecked());

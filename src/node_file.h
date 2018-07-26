@@ -89,8 +89,15 @@ class FSReqBase : public ReqWrap<uv_fs_t> {
 
 class FSReqCallback : public FSReqBase {
  public:
-  FSReqCallback(Environment* env, Local<Object> req, bool use_bigint, bool is_async)
-      : FSReqBase(env, req, AsyncWrap::PROVIDER_FSREQCALLBACK, use_bigint, is_async) { }
+  FSReqCallback(Environment* env,
+                Local<Object> req,
+                bool use_bigint,
+                bool is_async)
+      : FSReqBase(env,
+                  req,
+                  AsyncWrap::PROVIDER_FSREQCALLBACK,
+                  use_bigint,
+                  is_async) { }
 
   void Reject(Local<Value> reject) override;
   void Resolve(Local<Value> value) override;
@@ -107,8 +114,15 @@ class FSReqCallback : public FSReqBase {
 
 class FSReqSync : public FSReqBase {
  public:
-  FSReqSync(Environment* env, Local<Object> req, bool use_bigint, bool is_async)
-      : FSReqBase(env, req, AsyncWrap::PROVIDER_FSREQCALLBACK, use_bigint, is_async) { }
+  FSReqSync(Environment* env,
+            Local<Object> req,
+            bool use_bigint,
+            bool is_async)
+      : FSReqBase(env,
+                  req,
+                  AsyncWrap::PROVIDER_FSREQCALLBACK,
+                  use_bigint,
+                  is_async) { }
 
   ~FSReqSync() { uv_fs_req_cleanup(req()); }
 
@@ -128,8 +142,15 @@ class FSReqSync : public FSReqBase {
 template <typename NativeT = double, typename V8T = v8::Float64Array>
 class FSReqPromise : public FSReqBase {
  public:
-  explicit FSReqPromise(Environment* env, Local<Object> object, bool use_bigint, bool is_async)
-      : FSReqBase(env, object, AsyncWrap::PROVIDER_FSREQPROMISE, use_bigint, is_async),
+  explicit FSReqPromise(Environment* env,
+                        Local<Object> object,
+                        bool use_bigint,
+                        bool is_async)
+      : FSReqBase(env,
+                 object,
+                 AsyncWrap::PROVIDER_FSREQPROMISE,
+                 use_bigint,
+                 is_async),
         stats_field_array_(env->isolate(), env->kFsStatsFieldsLength) {
     auto resolver = Promise::Resolver::New(env->context()).ToLocalChecked();
     object->Set(env->context(), env->promise_string(),
