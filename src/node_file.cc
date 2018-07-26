@@ -614,18 +614,6 @@ void AfterScanDir(uv_fs_t* req) {
 }
 
 
-// This class is only used on sync fs calls.
-// For async calls FSReqCallback is used.
-class FSReqWrapSync {
- public:
-  FSReqWrapSync() {}
-  ~FSReqWrapSync() { uv_fs_req_cleanup(&req); }
-  uv_fs_t req;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(FSReqWrapSync);
-};
-
 // Returns nullptr if the operation fails from the start.
 template <typename Func, typename... Args>
 inline int AsyncDestCall(Environment* env,
@@ -684,28 +672,6 @@ inline int AsyncCall(Environment* env,
                        after, fn, fn_args...);
 }
 
-// Template counterpart of SYNC_CALL, except that it only puts
-// the error number and the syscall in the context instead of
-// creating an error in the C++ land.
-// ctx must be checked using value->IsObject() before being passed.
-template <typename Func, typename... Args>
-inline int SyncCall(Environment* env, Local<Value> ctx, FSReqWrapSync* req_wrap,
-    const char* syscall, Func fn, Args... args) {
-  env->PrintSyncTrace();
-  int err = fn(env->event_loop(), &(req_wrap->req), args..., nullptr);
-  if (err < 0) {
-    Local<Context> context = env->context();
-    Local<Object> ctx_obj = ctx.As<Object>();
-    Isolate* isolate = env->isolate();
-    ctx_obj->Set(context,
-             env->errno_string(),
-             Integer::New(isolate, err)).FromJust();
-    ctx_obj->Set(context,
-             env->syscall_string(),
-             OneByteString(isolate, syscall)).FromJust();
-  }
-  return err;
-}
 
 inline FSReqBase* GetReqWrap(Environment* env, Local<Value> value) {
   if (value->IsObject()) {
