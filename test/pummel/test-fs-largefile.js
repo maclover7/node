@@ -46,7 +46,7 @@ assert.strictEqual(readBuf[0], 0);
 
 // Verify that floating point positions do not throw.
 fs.writeSync(fd, writeBuf, 0, writeBuf.length, 42.000001);
-fs.close(fd);
+fs.close(fd, () => {});
 
 // Normally, we don't clean up tmp files at the end of a test, but we'll make an
 // exception for a 5 GB file.

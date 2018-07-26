@@ -27,8 +27,8 @@ class FSReqBase : public ReqWrap<uv_fs_t> {
   typedef MaybeStackBuffer<char, 64> FSReqBuffer;
 
   FSReqBase(Environment* env, Local<Object> req, AsyncWrap::ProviderType type,
-            bool use_bigint)
-      : ReqWrap(env, req, type), use_bigint_(use_bigint) {
+            bool use_bigint, bool is_async)
+      : ReqWrap(env, req, type), use_bigint_(use_bigint), is_async_(is_async) {
   }
 
   void Init(const char* syscall,
@@ -67,6 +67,7 @@ class FSReqBase : public ReqWrap<uv_fs_t> {
   enum encoding encoding() const { return encoding_; }
 
   bool use_bigint() const { return use_bigint_; }
+  bool IsAsync() const { return is_async_; }
 
   static FSReqBase* from_req(uv_fs_t* req) {
     return static_cast<FSReqBase*>(ReqWrap::from_req(req));
@@ -77,6 +78,7 @@ class FSReqBase : public ReqWrap<uv_fs_t> {
   bool has_data_ = false;
   const char* syscall_ = nullptr;
   bool use_bigint_ = false;
+  bool is_async_ = true;
 
   // Typically, the content of buffer_ is something like a file name, so
   // something around 64 bytes should be enough.
@@ -87,8 +89,8 @@ class FSReqBase : public ReqWrap<uv_fs_t> {
 
 class FSReqCallback : public FSReqBase {
  public:
-  FSReqCallback(Environment* env, Local<Object> req, bool use_bigint)
-      : FSReqBase(env, req, AsyncWrap::PROVIDER_FSREQCALLBACK, use_bigint) { }
+  FSReqCallback(Environment* env, Local<Object> req, bool use_bigint, bool is_async)
+      : FSReqBase(env, req, AsyncWrap::PROVIDER_FSREQCALLBACK, use_bigint, is_async) { }
 
   void Reject(Local<Value> reject) override;
   void Resolve(Local<Value> value) override;
@@ -103,11 +105,31 @@ class FSReqCallback : public FSReqBase {
   DISALLOW_COPY_AND_ASSIGN(FSReqCallback);
 };
 
+class FSReqSync : public FSReqBase {
+ public:
+  FSReqSync(Environment* env, Local<Object> req, bool use_bigint, bool is_async)
+      : FSReqBase(env, req, AsyncWrap::PROVIDER_FSREQCALLBACK, use_bigint, is_async) { }
+
+  ~FSReqSync() { uv_fs_req_cleanup(req()); }
+
+  void Reject(Local<Value> reject) override {};
+  void Resolve(Local<Value> value) override {};
+  void ResolveStat(const uv_stat_t* stat) override {};
+  void SetReturnValue(const FunctionCallbackInfo<Value>& args) override {};
+
+  void MemoryInfo(MemoryTracker* tracker) const override {
+    tracker->TrackThis(this);
+  }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(FSReqSync);
+};
+
 template <typename NativeT = double, typename V8T = v8::Float64Array>
 class FSReqPromise : public FSReqBase {
  public:
-  explicit FSReqPromise(Environment* env, Local<Object> object, bool use_bigint)
-      : FSReqBase(env, object, AsyncWrap::PROVIDER_FSREQPROMISE, use_bigint),
+  explicit FSReqPromise(Environment* env, Local<Object> object, bool use_bigint, bool is_async)
+      : FSReqBase(env, object, AsyncWrap::PROVIDER_FSREQPROMISE, use_bigint, is_async),
         stats_field_array_(env->isolate(), env->kFsStatsFieldsLength) {
     auto resolver = Promise::Resolver::New(env->context()).ToLocalChecked();
     object->Set(env->context(), env->promise_string(),
