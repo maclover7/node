@@ -1492,7 +1492,7 @@ static void WriteString(const FunctionCallbackInfo<Value>& args) {
   uv_buf_t uvbuf = uv_buf_init(*stack_buffer, len);
 
   uv_fs_cb cb = req_wrap->IsAsync() ? AfterInteger : nullptr;
-  int bytesWritten = AsyncCall(env, req_wrap, args, "write", UTF8, cb,
+  int bytesWritten = AsyncCall(env, req_wrap, args, "write", enc, cb,
               uv_fs_write, fd, &uvbuf, 1, pos);
   if (cb == nullptr) {
     FS_SYNC_TRACE_END(write, "bytesWritten", bytesWritten);
