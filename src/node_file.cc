@@ -899,6 +899,7 @@ static void LStat(const FunctionCallbackInfo<Value>& args) {
   }
 }
 
+// fstat(fd, use_bigint, req)
 static void FStat(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
@@ -926,6 +927,7 @@ static void FStat(const FunctionCallbackInfo<Value>& args) {
   }
 }
 
+// TODO
 // symlink(target, path, flags, req)
 static void Symlink(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
@@ -949,6 +951,7 @@ static void Symlink(const FunctionCallbackInfo<Value>& args) {
     delete req_wrap;
 }
 
+// TODO
 // link(src, dest, req)
 static void Link(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
@@ -984,7 +987,7 @@ static void ReadLink(const FunctionCallbackInfo<Value>& args) {
 
   FSReqBase* req_wrap = GetReqWrap(env, args[2]);
   uv_fs_cb cb = req_wrap->IsAsync() ? AfterStringPtr : nullptr;
-  int err = AsyncCall(env, req_wrap, args, "readlink", UTF8, cb,
+  int err = AsyncCall(env, req_wrap, args, "readlink", encoding, cb,
               uv_fs_readlink, *path);
   if (cb == nullptr) {
     if (err != 0) {
@@ -1009,6 +1012,7 @@ static void ReadLink(const FunctionCallbackInfo<Value>& args) {
   }
 }
 
+// TODO
 static void Rename(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
@@ -1118,87 +1122,6 @@ static void RMDir(const FunctionCallbackInfo<Value>& args) {
     delete req_wrap;
 }
 
-//template <typename Func, typename... Args>
-//inline FSReqBase* SyncCall3(Environment* env,
-  //FSReqBase* req_wrap,
-  //const FunctionCallbackInfo<Value>& args,
-  //const char* syscall, enum encoding enc,
-  //uv_fs_cb after, Func fn, Args... fn_args) {
-    //FS_SYNC_TRACE_BEGIN(syscall);
-
-    //env->PrintSyncTrace();
-    //int err = fn(env->event_loop(), req_wrap->req(), fn_args..., after);
-    //req_wrap->Dispatched();
-    //if (err < 0) {
-      //Local<Context> context = env->context();
-      //Isolate* isolate = env->isolate();
-      //req_wrap->object()->Set(context,
-               //env->errno_string(),
-               //Integer::New(isolate, err)).FromJust();
-      //req_wrap->object()->Set(context,
-               //env->syscall_string(),
-               //OneByteString(isolate, syscall)).FromJust();
-    //}
-
-    //FS_SYNC_TRACE_END(syscall);
-
-    //return err;
-//}
-
-template <typename Func, typename... Args>
-inline FSReqBase* AsyncDestCall2(Environment* env,
-    FSReqBase* req_wrap,
-    const FunctionCallbackInfo<Value>& args,
-    const char* syscall, const char* dest, size_t len,
-    enum encoding enc, uv_fs_cb after, Func fn, Args... fn_args) {
-  if (after == nullptr) {
-    FS_SYNC_TRACE_BEGIN(syscall);
-    env->PrintSyncTrace();
-  }
-
-  CHECK_NOT_NULL(req_wrap);
-  req_wrap->Init(syscall, dest, len, enc);
-
-  int err = fn(env->event_loop(), req_wrap->req(), fn_args..., after);
-  req_wrap->Dispatched();
-  if (err < 0) {
-    if (after == nullptr) {
-      Local<Context> context = env->context();
-      Isolate* isolate = env->isolate();
-      req_wrap->object()->Set(context,
-               env->errno_string(),
-               Integer::New(isolate, err)).FromJust();
-      req_wrap->object()->Set(context,
-               env->syscall_string(),
-               OneByteString(isolate, syscall)).FromJust();
-    } else {
-      uv_fs_t* uv_req = req_wrap->req();
-      uv_req->result = err;
-      uv_req->path = nullptr;
-      after(uv_req);  // after may delete req_wrap if there is an error
-      req_wrap = nullptr;
-    }
-  } else {
-    req_wrap->SetReturnValue(args);
-  }
-
-  if (after == nullptr) {
-    FS_SYNC_TRACE_END(syscall);
-  }
-
-  return req_wrap;
-}
-
-template <typename Func, typename... Args>
-inline FSReqBase* SyncCall4(Environment* env,
-  FSReqBase* req_wrap,
-  const FunctionCallbackInfo<Value>& args,
-  const char* syscall, enum encoding enc,
-  uv_fs_cb after, Func fn, Args... fn_args) {
-    return AsyncDestCall2(env, req_wrap, args,
-                         syscall, nullptr, 0, enc,
-                         after, fn, fn_args...);
-}
 
 // mkdir(path, mode, req)
 static void MKDir(const FunctionCallbackInfo<Value>& args) {
@@ -1235,7 +1158,7 @@ static void RealPath(const FunctionCallbackInfo<Value>& args) {
 
   FSReqBase* req_wrap = GetReqWrap(env, args[2]);
   uv_fs_cb cb = req_wrap->IsAsync() ? AfterStringPtr : nullptr;
-  int err = AsyncCall(env, req_wrap, args, "realpath", UTF8, cb,
+  int err = AsyncCall(env, req_wrap, args, "realpath", encoding, cb,
               uv_fs_realpath, *path);
   if (cb == nullptr) {
     if (err != 0) {
@@ -1384,7 +1307,7 @@ static void OpenFileHandle(const FunctionCallbackInfo<Value>& args) {
   int err = AsyncCall(env, req_wrap, args, "open", UTF8, cb,
               uv_fs_open, *path, flags, mode);
   if (cb == nullptr) {
-    if (err != 0) {
+    if (err < 0) {
       return;
     }
 
@@ -1462,11 +1385,12 @@ static void WriteBuffer(const FunctionCallbackInfo<Value>& args) {
 
   FSReqBase* req_wrap = GetReqWrap(env, args[5]);
   uv_fs_cb cb = req_wrap->IsAsync() ? AfterInteger : nullptr;
-  AsyncCall(env, req_wrap, args, "write", UTF8, cb,
+  int bytesWritten = AsyncCall(env, req_wrap, args, "write", UTF8, cb,
               uv_fs_write, fd, &uvbuf, 1, pos);
-  if (cb == nullptr)
-    // FS_SYNC_TRACE_END(write, "bytesWritten", bytesWritten);
+  if (cb == nullptr) {
+    FS_SYNC_TRACE_END(write, "bytesWritten", bytesWritten);
     delete req_wrap;
+  }
 }
 
 
@@ -1501,10 +1425,12 @@ static void WriteBuffers(const FunctionCallbackInfo<Value>& args) {
 
   FSReqBase* req_wrap = GetReqWrap(env, args[3]);
   uv_fs_cb cb = req_wrap->IsAsync() ? AfterInteger : nullptr;
-  AsyncCall(env, req_wrap, args, "write", UTF8, cb,
+  int bytesWritten = AsyncCall(env, req_wrap, args, "write", UTF8, cb,
               uv_fs_write, fd, *iovs, iovs.length(), pos);
-  if (cb == nullptr)
+  if (cb == nullptr) {
+    FS_SYNC_TRACE_END(write, "bytesWritten", bytesWritten);
     delete req_wrap;
+  }
 }
 
 
@@ -1566,10 +1492,12 @@ static void WriteString(const FunctionCallbackInfo<Value>& args) {
   uv_buf_t uvbuf = uv_buf_init(*stack_buffer, len);
 
   uv_fs_cb cb = req_wrap->IsAsync() ? AfterInteger : nullptr;
-  AsyncCall(env, req_wrap, args, "write", UTF8, cb,
+  int bytesWritten = AsyncCall(env, req_wrap, args, "write", UTF8, cb,
               uv_fs_write, fd, &uvbuf, 1, pos);
-  if (cb == nullptr)
+  if (cb == nullptr) {
+    FS_SYNC_TRACE_END(write, "bytesWritten", bytesWritten);
     delete req_wrap;
+  }
 }
 
 
@@ -1614,11 +1542,12 @@ static void Read(const FunctionCallbackInfo<Value>& args) {
 
   FSReqBase* req_wrap = GetReqWrap(env, args[5]);
   uv_fs_cb cb = req_wrap->IsAsync() ? AfterInteger : nullptr;
-  AsyncCall(env, req_wrap, args, "read", UTF8, cb,
+  int bytesRead = AsyncCall(env, req_wrap, args, "read", UTF8, cb,
               uv_fs_read, fd, &uvbuf, 1, pos);
-  if (cb == nullptr)
-    // FS_SYNC_TRACE_END(read, "bytesRead", bytesRead);
+  if (cb == nullptr) {
+    FS_SYNC_TRACE_END(read, "bytesRead", bytesRead);
     delete req_wrap;
+  }
 }
 
 
