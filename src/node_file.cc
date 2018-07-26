@@ -989,7 +989,7 @@ static void ReadLink(const FunctionCallbackInfo<Value>& args) {
   int err = AsyncCall(env, req_wrap, args, "readlink", encoding, cb,
               uv_fs_readlink, *path);
   if (cb == nullptr) {
-    if (err != 0) {
+    if (err < 0) {
       return;
     }
 
