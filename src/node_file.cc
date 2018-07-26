@@ -665,9 +665,8 @@ inline int AsyncDestCall(Environment* env,
     req_wrap->SetReturnValue(args);
   }
 
-  if (after == nullptr) {
+  if (after == nullptr)
     FS_SYNC_TRACE_END(syscall);
-  }
 
   return err;
 }
@@ -864,7 +863,7 @@ static void Stat(const FunctionCallbackInfo<Value>& args) {
 
     Local<Value> arr = node::FillGlobalStatsArray(env,
         static_cast<const uv_stat_t*>(req_wrap->req()->ptr),
-                                      req_wrap->use_bigint());
+                                      args[1]->IsTrue());
     args.GetReturnValue().Set(arr);
 
     delete req_wrap;
@@ -892,7 +891,7 @@ static void LStat(const FunctionCallbackInfo<Value>& args) {
 
     Local<Value> arr = node::FillGlobalStatsArray(env,
         static_cast<const uv_stat_t*>(req_wrap->req()->ptr),
-                                      req_wrap->use_bigint());
+                                      args[1]->IsTrue());
     args.GetReturnValue().Set(arr);
 
     delete req_wrap;
@@ -920,7 +919,7 @@ static void FStat(const FunctionCallbackInfo<Value>& args) {
 
     Local<Value> arr = node::FillGlobalStatsArray(env,
         static_cast<const uv_stat_t*>(req_wrap->req()->ptr),
-                                      req_wrap->use_bigint());
+                                      args[1]->IsTrue());
     args.GetReturnValue().Set(arr);
 
     delete req_wrap;
@@ -1161,7 +1160,7 @@ static void RealPath(const FunctionCallbackInfo<Value>& args) {
   int err = AsyncCall(env, req_wrap, args, "realpath", encoding, cb,
               uv_fs_realpath, *path);
   if (cb == nullptr) {
-    if (err != 0) {
+    if (err < 0) {
       return;
     }
 
@@ -1304,15 +1303,15 @@ static void OpenFileHandle(const FunctionCallbackInfo<Value>& args) {
 
   FSReqBase* req_wrap = GetReqWrap(env, args[3]);
   uv_fs_cb cb = req_wrap->IsAsync() ? AfterOpenFileHandle : nullptr;
-  int err = AsyncCall(env, req_wrap, args, "open", UTF8, cb,
+  int result = AsyncCall(env, req_wrap, args, "open", UTF8, cb,
               uv_fs_open, *path, flags, mode);
   if (cb == nullptr) {
-    if (err < 0) {
+    if (result < 0) {
       return;
     }
 
     HandleScope scope(env->isolate());
-    FileHandle* fd = new FileHandle(env, req_wrap->req()->result);
+    FileHandle* fd = new FileHandle(env, result);
     args.GetReturnValue().Set(fd->object());
 
     delete req_wrap;
@@ -1389,6 +1388,7 @@ static void WriteBuffer(const FunctionCallbackInfo<Value>& args) {
               uv_fs_write, fd, &uvbuf, 1, pos);
   if (cb == nullptr) {
     FS_SYNC_TRACE_END(write, "bytesWritten", bytesWritten);
+    args.GetReturnValue().Set(bytesWritten);
     delete req_wrap;
   }
 }
@@ -1429,6 +1429,7 @@ static void WriteBuffers(const FunctionCallbackInfo<Value>& args) {
               uv_fs_write, fd, *iovs, iovs.length(), pos);
   if (cb == nullptr) {
     FS_SYNC_TRACE_END(write, "bytesWritten", bytesWritten);
+    args.GetReturnValue().Set(bytesWritten);
     delete req_wrap;
   }
 }
@@ -1496,6 +1497,7 @@ static void WriteString(const FunctionCallbackInfo<Value>& args) {
               uv_fs_write, fd, &uvbuf, 1, pos);
   if (cb == nullptr) {
     FS_SYNC_TRACE_END(write, "bytesWritten", bytesWritten);
+    args.GetReturnValue().Set(bytesWritten);
     delete req_wrap;
   }
 }
@@ -1546,6 +1548,7 @@ static void Read(const FunctionCallbackInfo<Value>& args) {
               uv_fs_read, fd, &uvbuf, 1, pos);
   if (cb == nullptr) {
     FS_SYNC_TRACE_END(read, "bytesRead", bytesRead);
+    args.GetReturnValue().Set(bytesRead);
     delete req_wrap;
   }
 }
