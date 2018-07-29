@@ -41,7 +41,7 @@ However, the deprecation identifier will not be modified.
 <a id="DEP0001"></a>
 ### DEP0001: http.OutgoingMessage.prototype.flush
 
-Type: Runtime
+Type: End-of-Life
 
 The `OutgoingMessage.prototype.flush()` method is deprecated. Use
 `OutgoingMessage.prototype.flushHeaders()` instead.
