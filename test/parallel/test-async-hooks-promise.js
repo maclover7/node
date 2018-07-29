@@ -1,31 +1,55 @@
 'use strict';
+
 const common = require('../common');
+
 const assert = require('assert');
-const async_hooks = require('async_hooks');
+const { initHooks, checkInvocations } = require('../common/async-hooks');
 
 if (!common.isMainThread)
   common.skip('Worker bootstrapping works differently -> different async IDs');
 
-const initCalls = [];
-const resolveCalls = [];
+const hooks = initHooks();
 
-async_hooks.createHook({
-  init: common.mustCall((id, type, triggerId, resource) => {
-    assert.strictEqual(type, 'PROMISE');
-    initCalls.push({ id, triggerId, resource });
-  }, 2),
-  promiseResolve: common.mustCall((id) => {
-    assert.strictEqual(initCalls[resolveCalls.length].id, id);
-    resolveCalls.push(id);
-  }, 2)
-}).enable();
+hooks.enable();
 
-const a = Promise.resolve(42);
-const b = a.then(common.mustCall());
+const p = (new Promise(common.mustCall(executor)));
+p.then(afterresolution);
 
-assert.strictEqual(initCalls[0].triggerId, 1);
-assert.strictEqual(initCalls[0].resource.isChainedPromise, false);
-assert.strictEqual(initCalls[0].resource.promise, a);
-assert.strictEqual(initCalls[1].triggerId, initCalls[0].id);
-assert.strictEqual(initCalls[1].resource.isChainedPromise, true);
-assert.strictEqual(initCalls[1].resource.promise, b);
+function executor(resolve, reject) {
+  const as = hooks.activitiesOfTypes('PROMISE');
+  assert.strictEqual(as.length, 1);
+  const a = as[0];
+  checkInvocations(a, { init: 1 }, 'while in promise executor');
+  resolve(5);
+}
+
+function afterresolution(val) {
+  assert.strictEqual(val, 5);
+  const as = hooks.activitiesOfTypes('PROMISE');
+  assert.strictEqual(as.length, 2);
+  checkInvocations(as[0], { init: 1 }, 'after resolution parent promise');
+  checkInvocations(as[1], { init: 1, before: 1 },
+                   'after resolution child promise');
+}
+
+process.on('exit', onexit);
+function onexit() {
+  hooks.disable();
+  hooks.sanityCheck('PROMISE');
+
+  const as = hooks.activitiesOfTypes('PROMISE');
+  assert.strictEqual(as.length, 2);
+
+  const a0 = as[0];
+  assert.strictEqual(a0.type, 'PROMISE');
+  assert.strictEqual(typeof a0.uid, 'number');
+  assert.strictEqual(a0.triggerAsyncId, 1);
+  checkInvocations(a0, { init: 1 }, 'when process exits');
+
+  const a1 = as[1];
+  assert.strictEqual(a1.type, 'PROMISE');
+  assert.strictEqual(typeof a1.uid, 'number');
+  assert.strictEqual(a1.triggerAsyncId, a0.uid);
+  // We expect a destroy hook as well but we cannot guarantee predictable gc.
+  checkInvocations(a1, { init: 1, before: 1, after: 1 }, 'when process exits');
+}
