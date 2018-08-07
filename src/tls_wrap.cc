@@ -57,7 +57,6 @@ TLSWrap::TLSWrap(Environment* env,
                 env->tls_wrap_constructor_function()
                     ->NewInstance(env->context()).ToLocalChecked(),
                 AsyncWrap::PROVIDER_TLSWRAP),
-      SSLWrap<TLSWrap>(env, sc, kind),
       StreamBase(env),
       sc_(sc),
       enc_in_(nullptr),
@@ -67,7 +66,19 @@ TLSWrap::TLSWrap(Environment* env,
       established_(false),
       shutdown_(false),
       cycle_depth_(0),
-      eof_(false) {
+      eof_(false),
+      env_(env),
+      kind_(kind),
+      next_sess_(nullptr),
+      session_callbacks_(false),
+      new_session_wait_(false),
+      cert_cb_(nullptr),
+      cert_cb_arg_(nullptr),
+      cert_cb_running_(false) {
+  ssl_.reset(SSL_new(sc->ctx_.get()));
+  CHECK(ssl_);
+  env_->isolate()->AdjustAmountOfExternalAllocatedMemory(kExternalSize);
+
   MakeWeak();
 
   // sc comes from an Unwrap. Make sure it was assigned.
@@ -86,6 +97,7 @@ TLSWrap::TLSWrap(Environment* env,
 
 
 TLSWrap::~TLSWrap() {
+  DestroySSL();
   enc_in_ = nullptr;
   enc_out_ = nullptr;
   sc_ = nullptr;
