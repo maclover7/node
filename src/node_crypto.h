@@ -217,7 +217,6 @@ class SSLWrap : public AsyncWrap {
           SecureContext* sc,
           Kind kind)
       : AsyncWrap(env, obj, provider),
-        env_(env),
         kind_(kind),
         next_sess_(nullptr),
         session_callbacks_(false),
@@ -227,7 +226,7 @@ class SSLWrap : public AsyncWrap {
         cert_cb_running_(false) {
     ssl_.reset(SSL_new(sc->ctx_.get()));
     CHECK(ssl_);
-    env_->isolate()->AdjustAmountOfExternalAllocatedMemory(kExternalSize);
+    env->isolate()->AdjustAmountOfExternalAllocatedMemory(kExternalSize);
   }
 
   virtual ~SSLWrap() {
@@ -324,11 +323,6 @@ class SSLWrap : public AsyncWrap {
   void SetSNIContext(SecureContext* sc);
   int SetCACerts(SecureContext* sc);
 
-  inline Environment* ssl_env() const {
-    return env_;
-  }
-
-  Environment* const env_;
   Kind kind_;
   SSLSessionPointer next_sess_;
   SSLPointer ssl_;

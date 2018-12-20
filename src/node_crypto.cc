@@ -1482,7 +1482,7 @@ SSL_SESSION* SSLWrap::GetSessionCallback(SSL* s,
 
 int SSLWrap::NewSessionCallback(SSL* s, SSL_SESSION* sess) {
   SSLWrap* w = static_cast<SSLWrap*>(SSL_get_app_data(s));
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
   HandleScope handle_scope(env->isolate());
   Context::Scope context_scope(env->context());
 
@@ -1519,7 +1519,7 @@ int SSLWrap::NewSessionCallback(SSL* s, SSL_SESSION* sess) {
 void SSLWrap::OnClientHello(void* arg,
                             const ClientHelloParser::ClientHello& hello) {
   SSLWrap* w = static_cast<SSLWrap*>(arg);
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
   HandleScope handle_scope(env->isolate());
   Local<Context> context = env->context();
   Context::Scope context_scope(context);
@@ -1906,7 +1906,7 @@ static Local<Object> GetLastIssuedCert(X509Pointer* cert,
 void SSLWrap::GetPeerCertificate(const FunctionCallbackInfo<Value>& args) {
   SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
   if (w == nullptr) return;
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
 
   ClearErrorOnReturn clear_error_on_return;
 
@@ -1952,7 +1952,7 @@ void SSLWrap::GetPeerCertificate(const FunctionCallbackInfo<Value>& args) {
 void SSLWrap::GetCertificate(const FunctionCallbackInfo<Value>& args) {
   SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
   if (w == nullptr) return;
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
 
   ClearErrorOnReturn clear_error_on_return;
 
@@ -2106,7 +2106,7 @@ void SSLWrap::Renegotiate(const FunctionCallbackInfo<Value>& args) {
 void SSLWrap::GetTLSTicket(const FunctionCallbackInfo<Value>& args) {
   SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
   if (w == nullptr) return;
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
 
   SSL_SESSION* sess = SSL_get_session(w->ssl_.get());
   if (sess == nullptr)
@@ -2137,7 +2137,7 @@ void SSLWrap::NewSessionDone(const FunctionCallbackInfo<Value>& args) {
 void SSLWrap::SetOCSPResponse(const FunctionCallbackInfo<Value>& args) {
   SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
   if (w == nullptr) return;
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
 
   if (args.Length() < 1)
     return THROW_ERR_MISSING_ARGS(env, "OCSP response argument is mandatory");
@@ -2222,7 +2222,7 @@ void SSLWrap::SetMaxSendFragment(const FunctionCallbackInfo<Value>& args) {
 
   int rv = SSL_set_max_send_fragment(
       w->ssl_.get(),
-      args[0]->Int32Value(w->ssl_env()->context()).FromJust());
+      args[0]->Int32Value(w->env()->context()).FromJust());
   args.GetReturnValue().Set(rv);
 }
 #endif  // SSL_set_max_send_fragment
@@ -2284,7 +2284,7 @@ void SSLWrap::VerifyError(const FunctionCallbackInfo<Value>& args) {
   Local<Value> exception_value = Exception::Error(reason_string);
   Local<Object> exception_object =
     exception_value->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
-  exception_object->Set(w->ssl_env()->context(), w->ssl_env()->code_string(),
+  exception_object->Set(w->env()->context(), w->env()->code_string(),
                         OneByteString(isolate, code)).FromJust();
   args.GetReturnValue().Set(exception_object);
 }
@@ -2293,7 +2293,7 @@ void SSLWrap::VerifyError(const FunctionCallbackInfo<Value>& args) {
 void SSLWrap::GetCurrentCipher(const FunctionCallbackInfo<Value>& args) {
   SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
   if (w == nullptr) return;
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
   Local<Context> context = env->context();
 
   const SSL_CIPHER* c = SSL_get_current_cipher(w->ssl_.get());
@@ -2327,7 +2327,7 @@ int SSLWrap::SelectALPNCallback(SSL* s,
                                 void* arg) {
   SSLWrap* w = static_cast<SSLWrap*>(SSL_get_app_data(s));
 
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
   HandleScope handle_scope(env->isolate());
   Context::Scope context_scope(env->context());
 
@@ -2370,7 +2370,7 @@ void SSLWrap::GetALPNNegotiatedProto(const FunctionCallbackInfo<Value>& args) {
 void SSLWrap::SetALPNProtocols(const FunctionCallbackInfo<Value>& args) {
   SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
   if (w == nullptr) return;
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
   if (args.Length() < 1 || !Buffer::HasInstance(args[0]))
     return env->ThrowTypeError("Must give a Buffer as first argument");
 
@@ -2395,7 +2395,7 @@ void SSLWrap::SetALPNProtocols(const FunctionCallbackInfo<Value>& args) {
 
 int SSLWrap::TLSExtStatusCallback(SSL* s, void* arg) {
   SSLWrap* w = static_cast<SSLWrap*>(SSL_get_app_data(s));
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
   HandleScope handle_scope(env->isolate());
 
   if (w->is_client()) {
@@ -2493,7 +2493,7 @@ int SSLWrap::SSLCertCallback(SSL* s, void* arg) {
 void SSLWrap::CertCbDone(const FunctionCallbackInfo<Value>& args) {
   SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
   if (w == nullptr) return;
-  Environment* env = w->ssl_env();
+  Environment* env = w->env();
 
   CHECK(w->is_waiting_cert_cb() && w->cert_cb_running_);
 
@@ -2559,7 +2559,7 @@ void SSLWrap::DestroySSL() {
   if (!ssl_)
     return;
 
-  env_->isolate()->AdjustAmountOfExternalAllocatedMemory(-kExternalSize);
+  env()->isolate()->AdjustAmountOfExternalAllocatedMemory(-kExternalSize);
   ssl_.reset();
 }
 
