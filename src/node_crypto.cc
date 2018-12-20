@@ -131,35 +131,6 @@ static X509_STORE* root_cert_store;
 
 static bool extra_root_certs_loaded = false;
 
-// Just to generate static methods
-template void SSLWrap<TLSWrap>::AddMethods(Environment* env,
-                                           Local<FunctionTemplate> t);
-template void SSLWrap<TLSWrap>::ConfigureSecureContext(SecureContext* sc);
-template void SSLWrap<TLSWrap>::SetSNIContext(SecureContext* sc);
-template int SSLWrap<TLSWrap>::SetCACerts(SecureContext* sc);
-template SSL_SESSION* SSLWrap<TLSWrap>::GetSessionCallback(
-    SSL* s,
-    const unsigned char* key,
-    int len,
-    int* copy);
-template int SSLWrap<TLSWrap>::NewSessionCallback(SSL* s,
-                                                  SSL_SESSION* sess);
-template void SSLWrap<TLSWrap>::OnClientHello(
-    void* arg,
-    const ClientHelloParser::ClientHello& hello);
-template int SSLWrap<TLSWrap>::TLSExtStatusCallback(SSL* s, void* arg);
-template void SSLWrap<TLSWrap>::DestroySSL();
-template int SSLWrap<TLSWrap>::SSLCertCallback(SSL* s, void* arg);
-template void SSLWrap<TLSWrap>::WaitForCertCb(CertCb cb, void* arg);
-template int SSLWrap<TLSWrap>::SelectALPNCallback(
-    SSL* s,
-    const unsigned char** out,
-    unsigned char* outlen,
-    const unsigned char* in,
-    unsigned int inlen,
-    void* arg);
-
-
 static int PasswordCallback(char* buf, int size, int rwflag, void* u) {
   if (u) {
     size_t buflen = static_cast<size_t>(size);
@@ -1437,65 +1408,80 @@ void SecureContext::GetCertificate(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(buff);
 }
 
+void SSLWrap::AttachToObject(Local<Object> obj) {
+  obj->SetAlignedPointerInInternalField(kSSLWrapField, this);
+}
 
-template <class Base>
-void SSLWrap<Base>::AddMethods(Environment* env, Local<FunctionTemplate> t) {
-  HandleScope scope(env->isolate());
-
-  env->SetProtoMethodNoSideEffect(t, "getPeerCertificate", GetPeerCertificate);
-  env->SetProtoMethodNoSideEffect(t, "getCertificate", GetCertificate);
-  env->SetProtoMethodNoSideEffect(t, "getFinished", GetFinished);
-  env->SetProtoMethodNoSideEffect(t, "getPeerFinished", GetPeerFinished);
-  env->SetProtoMethodNoSideEffect(t, "getSession", GetSession);
-  env->SetProtoMethod(t, "setSession", SetSession);
-  env->SetProtoMethod(t, "loadSession", LoadSession);
-  env->SetProtoMethodNoSideEffect(t, "isSessionReused", IsSessionReused);
-  env->SetProtoMethodNoSideEffect(t, "verifyError", VerifyError);
-  env->SetProtoMethodNoSideEffect(t, "getCurrentCipher", GetCurrentCipher);
-  env->SetProtoMethod(t, "endParser", EndParser);
-  env->SetProtoMethod(t, "certCbDone", CertCbDone);
-  env->SetProtoMethod(t, "renegotiate", Renegotiate);
-  env->SetProtoMethodNoSideEffect(t, "getTLSTicket", GetTLSTicket);
-  env->SetProtoMethod(t, "newSessionDone", NewSessionDone);
-  env->SetProtoMethod(t, "setOCSPResponse", SetOCSPResponse);
-  env->SetProtoMethod(t, "requestOCSP", RequestOCSP);
-  env->SetProtoMethodNoSideEffect(t, "getEphemeralKeyInfo",
-                                  GetEphemeralKeyInfo);
-  env->SetProtoMethodNoSideEffect(t, "getProtocol", GetProtocol);
-
-#ifdef SSL_set_max_send_fragment
-  env->SetProtoMethod(t, "setMaxSendFragment", SetMaxSendFragment);
-#endif  // SSL_set_max_send_fragment
-
-  env->SetProtoMethodNoSideEffect(t, "getALPNNegotiatedProtocol",
-                                  GetALPNNegotiatedProto);
-  env->SetProtoMethod(t, "setALPNProtocols", SetALPNProtocols);
+SSLWrap* SSLWrap::FromObject(Local<Object> obj) {
+  return static_cast<SSLWrap*>(
+      obj->GetAlignedPointerFromInternalField(kSSLWrapField));
 }
 
 
-template <class Base>
-void SSLWrap<Base>::ConfigureSecureContext(SecureContext* sc) {
+Local<FunctionTemplate> SSLWrap::GetConstructorTemplate(
+    Environment* env) {
+  Local<FunctionTemplate> t = env->ssl_wrap_ctor_template();
+  if (t.IsEmpty()) {
+    t = env->NewFunctionTemplate(nullptr);
+    t->SetClassName(
+        FIXED_ONE_BYTE_STRING(env->isolate(), "SSLWrap"));
+    t->Inherit(AsyncWrap::GetConstructorTemplate(env));
+
+    env->SetProtoMethodNoSideEffect(t, "getPeerCertificate",
+        GetPeerCertificate);
+    env->SetProtoMethodNoSideEffect(t, "getCertificate", GetCertificate);
+    env->SetProtoMethodNoSideEffect(t, "getFinished", GetFinished);
+    env->SetProtoMethodNoSideEffect(t, "getPeerFinished", GetPeerFinished);
+    env->SetProtoMethodNoSideEffect(t, "getSession", GetSession);
+    env->SetProtoMethod(t, "setSession", SetSession);
+    env->SetProtoMethod(t, "loadSession", LoadSession);
+    env->SetProtoMethodNoSideEffect(t, "isSessionReused", IsSessionReused);
+    env->SetProtoMethodNoSideEffect(t, "verifyError", VerifyError);
+    env->SetProtoMethodNoSideEffect(t, "getCurrentCipher", GetCurrentCipher);
+    env->SetProtoMethod(t, "endParser", EndParser);
+    env->SetProtoMethod(t, "certCbDone", CertCbDone);
+    env->SetProtoMethod(t, "renegotiate", Renegotiate);
+    env->SetProtoMethodNoSideEffect(t, "getTLSTicket", GetTLSTicket);
+    env->SetProtoMethod(t, "newSessionDone", NewSessionDone);
+    env->SetProtoMethod(t, "setOCSPResponse", SetOCSPResponse);
+    env->SetProtoMethod(t, "requestOCSP", RequestOCSP);
+    env->SetProtoMethodNoSideEffect(t, "getEphemeralKeyInfo",
+                                    GetEphemeralKeyInfo);
+    env->SetProtoMethodNoSideEffect(t, "getProtocol", GetProtocol);
+
+#ifdef SSL_set_max_send_fragment
+    env->SetProtoMethod(t, "setMaxSendFragment", SetMaxSendFragment);
+#endif  // SSL_set_max_send_fragment
+
+    env->SetProtoMethodNoSideEffect(t, "getALPNNegotiatedProtocol",
+                                    GetALPNNegotiatedProto);
+    env->SetProtoMethod(t, "setALPNProtocols", SetALPNProtocols);
+    env->set_ssl_wrap_ctor_template(t);
+  }
+  return t;
+}
+
+
+void SSLWrap::ConfigureSecureContext(SecureContext* sc) {
   // OCSP stapling
   SSL_CTX_set_tlsext_status_cb(sc->ctx_.get(), TLSExtStatusCallback);
   SSL_CTX_set_tlsext_status_arg(sc->ctx_.get(), nullptr);
 }
 
 
-template <class Base>
-SSL_SESSION* SSLWrap<Base>::GetSessionCallback(SSL* s,
-                                               const unsigned char* key,
-                                               int len,
-                                               int* copy) {
-  Base* w = static_cast<Base*>(SSL_get_app_data(s));
+SSL_SESSION* SSLWrap::GetSessionCallback(SSL* s,
+                                         const unsigned char* key,
+                                         int len,
+                                         int* copy) {
+  SSLWrap* w = static_cast<SSLWrap*>(SSL_get_app_data(s));
 
   *copy = 0;
   return w->next_sess_.release();
 }
 
 
-template <class Base>
-int SSLWrap<Base>::NewSessionCallback(SSL* s, SSL_SESSION* sess) {
-  Base* w = static_cast<Base*>(SSL_get_app_data(s));
+int SSLWrap::NewSessionCallback(SSL* s, SSL_SESSION* sess) {
+  SSLWrap* w = static_cast<SSLWrap*>(SSL_get_app_data(s));
   Environment* env = w->ssl_env();
   HandleScope handle_scope(env->isolate());
   Context::Scope context_scope(env->context());
@@ -1530,10 +1516,9 @@ int SSLWrap<Base>::NewSessionCallback(SSL* s, SSL_SESSION* sess) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::OnClientHello(void* arg,
-                                  const ClientHelloParser::ClientHello& hello) {
-  Base* w = static_cast<Base*>(arg);
+void SSLWrap::OnClientHello(void* arg,
+                            const ClientHelloParser::ClientHello& hello) {
+  SSLWrap* w = static_cast<SSLWrap*>(arg);
   Environment* env = w->ssl_env();
   HandleScope handle_scope(env->isolate());
   Local<Context> context = env->context();
@@ -1918,11 +1903,9 @@ static Local<Object> GetLastIssuedCert(X509Pointer* cert,
 }
 
 
-template <class Base>
-void SSLWrap<Base>::GetPeerCertificate(
-    const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::GetPeerCertificate(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
   Environment* env = w->ssl_env();
 
   ClearErrorOnReturn clear_error_on_return;
@@ -1966,11 +1949,9 @@ void SSLWrap<Base>::GetPeerCertificate(
 }
 
 
-template <class Base>
-void SSLWrap<Base>::GetCertificate(
-    const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::GetCertificate(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
   Environment* env = w->ssl_env();
 
   ClearErrorOnReturn clear_error_on_return;
@@ -1986,12 +1967,11 @@ void SSLWrap<Base>::GetCertificate(
 }
 
 
-template <class Base>
-void SSLWrap<Base>::GetFinished(const FunctionCallbackInfo<Value>& args) {
+void SSLWrap::GetFinished(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   // We cannot just pass nullptr to SSL_get_finished()
   // because it would further be propagated to memcpy(),
@@ -2009,12 +1989,11 @@ void SSLWrap<Base>::GetFinished(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::GetPeerFinished(const FunctionCallbackInfo<Value>& args) {
+void SSLWrap::GetPeerFinished(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   // We cannot just pass nullptr to SSL_get_peer_finished()
   // because it would further be propagated to memcpy(),
@@ -2032,12 +2011,11 @@ void SSLWrap<Base>::GetPeerFinished(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::GetSession(const FunctionCallbackInfo<Value>& args) {
+void SSLWrap::GetSession(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   SSL_SESSION* sess = SSL_get_session(w->ssl_.get());
   if (sess == nullptr)
@@ -2053,12 +2031,11 @@ void SSLWrap<Base>::GetSession(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::SetSession(const FunctionCallbackInfo<Value>& args) {
+void SSLWrap::SetSession(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   if (args.Length() < 1) {
     return THROW_ERR_MISSING_ARGS(env, "Session argument is mandatory");
@@ -2083,10 +2060,9 @@ void SSLWrap<Base>::SetSession(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::LoadSession(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::LoadSession(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   if (args.Length() >= 1 && Buffer::HasInstance(args[0])) {
     ssize_t slen = Buffer::Length(args[0]);
@@ -2101,27 +2077,24 @@ void SSLWrap<Base>::LoadSession(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::IsSessionReused(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::IsSessionReused(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
   bool yes = SSL_session_reused(w->ssl_.get());
   args.GetReturnValue().Set(yes);
 }
 
 
-template <class Base>
-void SSLWrap<Base>::EndParser(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::EndParser(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
   w->hello_parser_.End();
 }
 
 
-template <class Base>
-void SSLWrap<Base>::Renegotiate(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::Renegotiate(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   ClearErrorOnReturn clear_error_on_return;
 
@@ -2130,10 +2103,9 @@ void SSLWrap<Base>::Renegotiate(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::GetTLSTicket(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::GetTLSTicket(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
   Environment* env = w->ssl_env();
 
   SSL_SESSION* sess = SSL_get_session(w->ssl_.get());
@@ -2154,20 +2126,18 @@ void SSLWrap<Base>::GetTLSTicket(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::NewSessionDone(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::NewSessionDone(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
   w->new_session_wait_ = false;
   w->NewSessionDoneCb();
 }
 
 
-template <class Base>
-void SSLWrap<Base>::SetOCSPResponse(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
-  Environment* env = w->env();
+void SSLWrap::SetOCSPResponse(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
+  Environment* env = w->ssl_env();
 
   if (args.Length() < 1)
     return THROW_ERR_MISSING_ARGS(env, "OCSP response argument is mandatory");
@@ -2178,20 +2148,17 @@ void SSLWrap<Base>::SetOCSPResponse(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::RequestOCSP(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::RequestOCSP(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   SSL_set_tlsext_status_type(w->ssl_.get(), TLSEXT_STATUSTYPE_ocsp);
 }
 
 
-template <class Base>
-void SSLWrap<Base>::GetEphemeralKeyInfo(
-    const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::GetEphemeralKeyInfo(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
   Environment* env = Environment::GetCurrent(args);
   Local<Context> context = env->context();
 
@@ -2247,13 +2214,11 @@ void SSLWrap<Base>::GetEphemeralKeyInfo(
 
 
 #ifdef SSL_set_max_send_fragment
-template <class Base>
-void SSLWrap<Base>::SetMaxSendFragment(
-    const FunctionCallbackInfo<Value>& args) {
+void SSLWrap::SetMaxSendFragment(const FunctionCallbackInfo<Value>& args) {
   CHECK(args.Length() >= 1 && args[0]->IsNumber());
 
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   int rv = SSL_set_max_send_fragment(
       w->ssl_.get(),
@@ -2263,10 +2228,9 @@ void SSLWrap<Base>::SetMaxSendFragment(
 #endif  // SSL_set_max_send_fragment
 
 
-template <class Base>
-void SSLWrap<Base>::VerifyError(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::VerifyError(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   // XXX(bnoordhuis) The UNABLE_TO_GET_ISSUER_CERT error when there is no
   // peer certificate is questionable but it's compatible with what was
@@ -2320,16 +2284,15 @@ void SSLWrap<Base>::VerifyError(const FunctionCallbackInfo<Value>& args) {
   Local<Value> exception_value = Exception::Error(reason_string);
   Local<Object> exception_object =
     exception_value->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
-  exception_object->Set(w->env()->context(), w->env()->code_string(),
+  exception_object->Set(w->ssl_env()->context(), w->ssl_env()->code_string(),
                         OneByteString(isolate, code)).FromJust();
   args.GetReturnValue().Set(exception_object);
 }
 
 
-template <class Base>
-void SSLWrap<Base>::GetCurrentCipher(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::GetCurrentCipher(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
   Environment* env = w->ssl_env();
   Local<Context> context = env->context();
 
@@ -2347,25 +2310,24 @@ void SSLWrap<Base>::GetCurrentCipher(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::GetProtocol(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::GetProtocol(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   const char* tls_version = SSL_get_version(w->ssl_.get());
   args.GetReturnValue().Set(OneByteString(args.GetIsolate(), tls_version));
 }
 
 
-template <class Base>
-int SSLWrap<Base>::SelectALPNCallback(SSL* s,
-                                      const unsigned char** out,
-                                      unsigned char* outlen,
-                                      const unsigned char* in,
-                                      unsigned int inlen,
-                                      void* arg) {
-  Base* w = static_cast<Base*>(SSL_get_app_data(s));
-  Environment* env = w->env();
+int SSLWrap::SelectALPNCallback(SSL* s,
+                                const unsigned char** out,
+                                unsigned char* outlen,
+                                const unsigned char* in,
+                                unsigned int inlen,
+                                void* arg) {
+  SSLWrap* w = static_cast<SSLWrap*>(SSL_get_app_data(s));
+
+  Environment* env = w->ssl_env();
   HandleScope handle_scope(env->isolate());
   Context::Scope context_scope(env->context());
 
@@ -2388,11 +2350,9 @@ int SSLWrap<Base>::SelectALPNCallback(SSL* s,
 }
 
 
-template <class Base>
-void SSLWrap<Base>::GetALPNNegotiatedProto(
-    const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
+void SSLWrap::GetALPNNegotiatedProto(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
 
   const unsigned char* alpn_proto;
   unsigned int alpn_proto_len;
@@ -2407,11 +2367,10 @@ void SSLWrap<Base>::GetALPNNegotiatedProto(
 }
 
 
-template <class Base>
-void SSLWrap<Base>::SetALPNProtocols(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
-  Environment* env = w->env();
+void SSLWrap::SetALPNProtocols(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
+  Environment* env = w->ssl_env();
   if (args.Length() < 1 || !Buffer::HasInstance(args[0]))
     return env->ThrowTypeError("Must give a Buffer as first argument");
 
@@ -2434,11 +2393,9 @@ void SSLWrap<Base>::SetALPNProtocols(const FunctionCallbackInfo<Value>& args) {
   }
 }
 
-
-template <class Base>
-int SSLWrap<Base>::TLSExtStatusCallback(SSL* s, void* arg) {
-  Base* w = static_cast<Base*>(SSL_get_app_data(s));
-  Environment* env = w->env();
+int SSLWrap::TLSExtStatusCallback(SSL* s, void* arg) {
+  SSLWrap* w = static_cast<SSLWrap*>(SSL_get_app_data(s));
+  Environment* env = w->ssl_env();
   HandleScope handle_scope(env->isolate());
 
   if (w->is_client()) {
@@ -2481,16 +2438,14 @@ int SSLWrap<Base>::TLSExtStatusCallback(SSL* s, void* arg) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::WaitForCertCb(CertCb cb, void* arg) {
+void SSLWrap::WaitForCertCb(CertCb cb, void* arg) {
   cert_cb_ = cb;
   cert_cb_arg_ = arg;
 }
 
 
-template <class Base>
-int SSLWrap<Base>::SSLCertCallback(SSL* s, void* arg) {
-  Base* w = static_cast<Base*>(SSL_get_app_data(s));
+int SSLWrap::SSLCertCallback(SSL* s, void* arg) {
+  SSLWrap* w = static_cast<SSLWrap*>(SSL_get_app_data(s));
 
   if (!w->is_server())
     return 1;
@@ -2535,11 +2490,10 @@ int SSLWrap<Base>::SSLCertCallback(SSL* s, void* arg) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::CertCbDone(const FunctionCallbackInfo<Value>& args) {
-  Base* w;
-  ASSIGN_OR_RETURN_UNWRAP(&w, args.Holder());
-  Environment* env = w->env();
+void SSLWrap::CertCbDone(const FunctionCallbackInfo<Value>& args) {
+  SSLWrap* w = SSLWrap::FromObject(args.Holder().As<Object>());
+  if (w == nullptr) return;
+  Environment* env = w->ssl_env();
 
   CHECK(w->is_waiting_cert_cb() && w->cert_cb_running_);
 
@@ -2601,8 +2555,7 @@ void SSLWrap<Base>::CertCbDone(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::DestroySSL() {
+void SSLWrap::DestroySSL() {
   if (!ssl_)
     return;
 
@@ -2611,8 +2564,7 @@ void SSLWrap<Base>::DestroySSL() {
 }
 
 
-template <class Base>
-void SSLWrap<Base>::SetSNIContext(SecureContext* sc) {
+void SSLWrap::SetSNIContext(SecureContext* sc) {
   ConfigureSecureContext(sc);
   CHECK_EQ(SSL_set_SSL_CTX(ssl_.get(), sc->ctx_.get()), sc->ctx_.get());
 
@@ -2620,8 +2572,7 @@ void SSLWrap<Base>::SetSNIContext(SecureContext* sc) {
 }
 
 
-template <class Base>
-int SSLWrap<Base>::SetCACerts(SecureContext* sc) {
+int SSLWrap::SetCACerts(SecureContext* sc) {
   int err = SSL_set1_verify_cert_store(ssl_.get(),
                                        SSL_CTX_get_cert_store(sc->ctx_.get()));
   if (err != 1)

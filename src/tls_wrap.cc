@@ -52,11 +52,12 @@ TLSWrap::TLSWrap(Environment* env,
                  Kind kind,
                  StreamBase* stream,
                  SecureContext* sc)
-    : AsyncWrap(env,
-                env->tls_wrap_constructor_function()
-                    ->NewInstance(env->context()).ToLocalChecked(),
-                AsyncWrap::PROVIDER_TLSWRAP),
-      SSLWrap<TLSWrap>(env, sc, kind),
+    : SSLWrap(env,
+              env->tls_wrap_constructor_function()
+                ->NewInstance(env->context()).ToLocalChecked(),
+              AsyncWrap::PROVIDER_TLSWRAP,
+              sc,
+              kind),
       StreamBase(env),
       sc_(sc) {
   MakeWeak();
@@ -66,9 +67,9 @@ TLSWrap::TLSWrap(Environment* env,
 
   // We've our own session callbacks
   SSL_CTX_sess_set_get_cb(sc_->ctx_.get(),
-                          SSLWrap<TLSWrap>::GetSessionCallback);
+                          SSLWrap::GetSessionCallback);
   SSL_CTX_sess_set_new_cb(sc_->ctx_.get(),
-                          SSLWrap<TLSWrap>::NewSessionCallback);
+                          SSLWrap::NewSessionCallback);
 
   stream->PushStreamListener(this);
 
@@ -125,7 +126,7 @@ void TLSWrap::InitSSL() {
 
   ConfigureSecureContext(sc_);
 
-  SSL_set_cert_cb(ssl_.get(), SSLWrap<TLSWrap>::SSLCertCallback, this);
+  SSL_set_cert_cb(ssl_.get(), SSLWrap::SSLCertCallback, this);
 
   if (is_server()) {
     SSL_set_accept_state(ssl_.get());
@@ -150,8 +151,8 @@ void TLSWrap::Wrap(const FunctionCallbackInfo<Value>& args) {
 
   Local<External> stream_obj = args[0].As<External>();
   Local<Object> sc = args[1].As<Object>();
-  Kind kind = args[2]->IsTrue() ? SSLWrap<TLSWrap>::kServer :
-                                  SSLWrap<TLSWrap>::kClient;
+  Kind kind = args[2]->IsTrue() ? SSLWrap::kServer :
+                                  SSLWrap::kClient;
 
   StreamBase* stream = static_cast<StreamBase*>(stream_obj->Value());
   CHECK_NOT_NULL(stream);
@@ -730,7 +731,7 @@ void TLSWrap::EnableSessionCallbacks(
   CHECK_NOT_NULL(wrap->ssl_);
   wrap->enable_session_callbacks();
   crypto::NodeBIO::FromBIO(wrap->enc_in_)->set_initial(kMaxHelloLength);
-  wrap->hello_parser_.Start(SSLWrap<TLSWrap>::OnClientHello,
+  wrap->hello_parser_.Start(SSLWrap::OnClientHello,
                             OnClientHelloParseEnd,
                             wrap);
 }
@@ -747,7 +748,7 @@ void TLSWrap::DestroySSL(const FunctionCallbackInfo<Value>& args) {
   wrap->InvokeQueued(UV_ECANCELED, "Canceled because of SSL destruction");
 
   // Destroy the SSL structure and friends
-  wrap->SSLWrap<TLSWrap>::DestroySSL();
+  wrap->SSLWrap::DestroySSL();
   wrap->enc_in_ = nullptr;
   wrap->enc_out_ = nullptr;
 
@@ -893,7 +894,7 @@ void TLSWrap::Initialize(Local<Object> target,
       Local<FunctionTemplate>(),
       static_cast<PropertyAttribute>(ReadOnly | DontDelete));
 
-  t->Inherit(AsyncWrap::GetConstructorTemplate(env));
+  t->Inherit(SSLWrap::GetConstructorTemplate(env));
   env->SetProtoMethod(t, "receive", Receive);
   env->SetProtoMethod(t, "start", Start);
   env->SetProtoMethod(t, "setVerifyMode", SetVerifyMode);
@@ -902,7 +903,7 @@ void TLSWrap::Initialize(Local<Object> target,
   env->SetProtoMethod(t, "enableCertCb", EnableCertCb);
 
   StreamBase::AddMethods<TLSWrap>(env, t);
-  SSLWrap<TLSWrap>::AddMethods(env, t);
+  t->InstanceTemplate()->SetInternalFieldCount(SSLWrap::kSSLWrapField + 1);
 
   env->SetProtoMethod(t, "getServername", GetServername);
   env->SetProtoMethod(t, "setServername", SetServername);

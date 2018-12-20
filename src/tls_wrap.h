@@ -45,8 +45,7 @@ class SecureContext;
 class NodeBIO;
 }
 
-class TLSWrap : public AsyncWrap,
-                public crypto::SSLWrap<TLSWrap>,
+class TLSWrap : public crypto::SSLWrap,
                 public StreamBase,
                 public StreamListener {
  public:
@@ -75,7 +74,7 @@ class TLSWrap : public AsyncWrap,
   const char* Error() const override;
   void ClearError() override;
 
-  void NewSessionDoneCb();
+  void NewSessionDoneCb() override;
 
   void MemoryInfo(MemoryTracker* tracker) const override;
 

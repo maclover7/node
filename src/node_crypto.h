@@ -26,7 +26,7 @@
 
 #include "node.h"
 // ClientHelloParser
-#include "node_crypto_clienthello.h"
+#include "node_crypto_clienthello-inl.h"
 
 #include "node_buffer.h"
 
@@ -204,18 +204,20 @@ class SecureContext : public BaseObject {
   }
 };
 
-// SSLWrap implicitly depends on the inheriting class' handle having an
-// internal pointer to the Base class.
-template <class Base>
-class SSLWrap {
+class SSLWrap : public AsyncWrap {
  public:
   enum Kind {
     kClient,
     kServer
   };
 
-  SSLWrap(Environment* env, SecureContext* sc, Kind kind)
-      : env_(env),
+  SSLWrap(Environment* env,
+          v8::Local<v8::Object> obj,
+          AsyncWrap::ProviderType provider,
+          SecureContext* sc,
+          Kind kind)
+      : AsyncWrap(env, obj, provider),
+        env_(env),
         kind_(kind),
         next_sess_(nullptr),
         session_callbacks_(false),
@@ -237,8 +239,14 @@ class SSLWrap {
   inline bool is_client() const { return kind_ == kClient; }
   inline bool is_waiting_new_session() const { return new_session_wait_; }
   inline bool is_waiting_cert_cb() const { return cert_cb_ != nullptr; }
+  static constexpr int kSSLWrapField = 1;
+  static SSLWrap* FromObject(v8::Local<v8::Object> obj);
+  static v8::Local<v8::FunctionTemplate>
+    GetConstructorTemplate(Environment* env);
+  virtual void NewSessionDoneCb() = 0;
 
  protected:
+  void AttachToObject(v8::Local<v8::Object>);
   typedef void (*CertCb)(void* arg);
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
@@ -254,7 +262,6 @@ class SSLWrap {
 #endif
 
   static void ConfigureSecureContext(SecureContext* sc);
-  static void AddMethods(Environment* env, v8::Local<v8::FunctionTemplate> t);
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
   static SSL_SESSION* GetSessionCallback(SSL* s,
